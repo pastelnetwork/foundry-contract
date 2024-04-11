@@ -1,0 +1,48 @@
+{
+  "description": "Pastel Pigeon Test NFT",
+  "external_url": "https://pastel.network/",
+  "image": "ipfs.io/ipfs/QmRka1ZL29tUpRzmMpMT7LfvndP2iy5Uka3Ua7TrevYfpV",
+  "name": "Pastel Pigeon #1",
+  "background_color": "99E1C8",
+  "attributes": [
+    {
+      "trait_type": "Personality",
+      "value": "Rebel"
+    },
+    {
+      "trait_type": "GPS Location",
+      "value": "One Police Plaza"
+    },
+    {
+      "trait_type": "Intelligence",
+      "value": 1
+    },
+    {
+      "trait_type": "Attitude",
+      "value": 4
+    },
+    {
+      "trait_type": "Swagger",
+      "value": 2
+    },
+    {
+      "trait_type": "Swagger",
+      "value": 2
+    },
+    {
+      "display_type": "Boost Percentage",
+      "trait_type": "Stamina Increase",
+      "value": 20
+    },
+    {
+      "display_type": "Flight Height",
+      "trait_type": "Stamina Increase",
+      "value": 60
+    },
+    {
+      "display_type": "Flight Height",
+      "trait_type": "Stamina Increase",
+      "value": 60
+    }
+  ]
+}
