@@ -114,7 +114,7 @@ contract FoundryDrop is
                 : hasUserMintedSmartmint[_userId] + _quantity <= maxPurchaseableCount,
             "You are not able to purchase those tokens"
         );
-        require(msg.value == price * _quantity, "Insufficient price");
+        require(msg.value >= price * _quantity, "Insufficient price");
 
         for (uint256 i = 0; i < _quantity; i++) {
             require(nextTokenId < maxSupply + 1, "No available tokens");
