@@ -23,8 +23,13 @@ if (!privateKey) {
   throw new Error("Please set your Private key in a .env file");
 }
 
-const testSignerPrivateKey: string | undefined = process.env.TEST_SIGNER_PRIVATE_KEY;
-if (!testSignerPrivateKey) {
+const testSignerPrivateKey1: string | undefined = process.env.TEST_SIGNER_PRIVATE_KEY1;
+if (!testSignerPrivateKey1) {
+  throw new Error("Please set your test signer's private key in a .env file");
+}
+
+const testSignerPrivateKey2: string | undefined = process.env.TEST_SIGNER_PRIVATE_KEY2;
+if (!testSignerPrivateKey2) {
   throw new Error("Please set your test signer's private key in a .env file");
 }
 
@@ -52,7 +57,7 @@ const chainIds = {
 function getChainConfig(network: keyof typeof chainIds, defaultUrl?: string): NetworkUserConfig {
   const url: string = defaultUrl || "https://" + network + ".infura.io/v3/" + infuraApiKey;
   return {
-    accounts: [privateKey || "", testSignerPrivateKey || ""],
+    accounts: [privateKey || "", testSignerPrivateKey1 || "", testSignerPrivateKey2 || ""],
     chainId: chainIds[network],
     url,
   };
@@ -91,7 +96,11 @@ const config: HardhatUserConfig = {
           balance: ethers.utils.parseEther("1000").toString(),
         },
         {
-          privateKey: testSignerPrivateKey || "",
+          privateKey: testSignerPrivateKey1 || "",
+          balance: ethers.utils.parseEther("1000").toString(),
+        },
+        {
+          privateKey: testSignerPrivateKey2 || "",
           balance: ethers.utils.parseEther("1000").toString(),
         },
       ],

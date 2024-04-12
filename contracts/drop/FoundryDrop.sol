@@ -30,15 +30,11 @@ contract FoundryDrop is
     uint8 public maxPurchaseableCount;
     string[] public cascadeUrls;
 
-    mapping(uint256 => bool) public isGuaranteedSmartmint;
-    mapping(uint256 => bool) public isWhitelistedSmartmint;
-    mapping(uint256 => uint8) public hasUserMintedSmartmint;
-
     mapping(address => bool) public isGuaranteedAddress;
     mapping(address => bool) public isWhitelistedAddress;
-    mapping(address => uint8) public hasUserMintedAddress;
+    mapping(address => uint256) public hasUserMintedAddress;
 
-    event Minted(address indexed _to, uint256 _userId, uint256 _tokenId);
+    event Minted(address indexed _to, uint256 _tokenId);
     event BaseURIChanged(string _uri);
 
     uint256 private nextTokenId;
@@ -89,29 +85,38 @@ contract FoundryDrop is
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function mint(uint256 _userId, uint256 _quantity) external payable nonReentrant {
+    function pre_mint(address pastelWallet, uint256 _quantity) external onlyOwner {
+        require(stage == 0, "Can only pre-mint when minting is not started");
+
+        for (uint256 i = 0; i < _quantity; i++) {
+            require(nextTokenId < maxSupply + 1, "No available tokens");
+            _safeMint(pastelWallet, nextTokenId);
+            hasUserMintedAddress[pastelWallet]++;
+            emit Minted(pastelWallet, nextTokenId);
+            nextTokenId += 1;
+        }
+    }
+
+    function mint(uint256 _quantity) external payable nonReentrant {
         require(
             _quantity <= maxPurchaseableCount && _quantity > 0,
             "Users can only mint from one to three tokens at a time"
         );
         require(stage > 0, "Not started minting yet");
-        bool isAddress = _userId == 0;
 
         if (stage == 1) {
             require(
-                isGuaranteedSmartmint[_userId] || (isAddress && isGuaranteedAddress[msg.sender]),
+                isGuaranteedAddress[msg.sender],
                 "You are not a guaranteed user, you are unable to mint during this stage"
             );
         } else if (stage == 2) {
             require(
-                isWhitelistedSmartmint[_userId] || (isAddress && isWhitelistedAddress[msg.sender]),
+                isWhitelistedAddress[msg.sender] || isGuaranteedAddress[msg.sender],
                 "You are not a FCFS user, you are unable to mint during this stage"
             );
         }
         require(
-            isAddress
-                ? hasUserMintedAddress[msg.sender] + _quantity <= maxPurchaseableCount
-                : hasUserMintedSmartmint[_userId] + _quantity <= maxPurchaseableCount,
+            hasUserMintedAddress[msg.sender] + _quantity <= maxPurchaseableCount,
             "You are not able to purchase those tokens"
         );
         require(msg.value >= price * _quantity, "Insufficient price");
@@ -119,15 +124,8 @@ contract FoundryDrop is
         for (uint256 i = 0; i < _quantity; i++) {
             require(nextTokenId < maxSupply + 1, "No available tokens");
             _safeMint(msg.sender, nextTokenId);
-
-            if (isAddress) {
-                hasUserMintedAddress[msg.sender]++;
-            } else {
-                hasUserMintedSmartmint[_userId]++;
-            }
-
-            emit Minted(msg.sender, _userId, nextTokenId);
-
+            hasUserMintedAddress[msg.sender]++;
+            emit Minted(msg.sender, nextTokenId);
             nextTokenId += 1;
         }
     }
@@ -167,18 +165,6 @@ contract FoundryDrop is
 
         stage = _stage;
         price = _price;
-    }
-
-    function setGuaranteedSmartmintUsers(uint256[] memory _guaranteedUsers) external onlyOwner {
-        for (uint256 i = 0; i < _guaranteedUsers.length; i++) {
-            isGuaranteedSmartmint[_guaranteedUsers[i]] = true;
-        }
-    }
-
-    function setWhiteListSmartmintUsers(uint256[] memory _whiteListUsers) external onlyOwner {
-        for (uint256 i = 0; i < _whiteListUsers.length; i++) {
-            isWhitelistedSmartmint[_whiteListUsers[i]] = true;
-        }
     }
 
     function setGuaranteedAddresses(address[] memory _guaranteedAddresses) external onlyOwner {

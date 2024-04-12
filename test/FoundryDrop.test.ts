@@ -14,8 +14,9 @@ describe("FoundryDrop", function () {
 
     const signers: SignerWithAddress[] = await ethers.getSigners();
     this.signers.admin = signers[0];
-    this.signers.alice = signers[1];
-    this.signers.foundry = signers[2];
+    this.signers.alice1 = signers[1];
+    this.signers.alice2 = signers[2];
+    this.signers.foundry = signers[3];
 
     const dropFactory: FoundryDrop__factory = <FoundryDrop__factory>await ethers.getContractFactory("FoundryDrop");
 
@@ -23,7 +24,7 @@ describe("FoundryDrop", function () {
       await upgrades.deployProxy(dropFactory, [
         "FoundrySample",
         "FoundrySample",
-        1000,
+        302,
         1,
         5,
         "base_uri",

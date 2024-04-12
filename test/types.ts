@@ -13,6 +13,7 @@ declare module "mocha" {
 
 export interface Signers {
   admin: SignerWithAddress;
-  alice: SignerWithAddress;
+  alice1: SignerWithAddress;
+  alice2: SignerWithAddress;
   foundry: SignerWithAddress;
 }

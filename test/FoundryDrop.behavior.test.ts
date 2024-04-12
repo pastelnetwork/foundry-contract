@@ -3,9 +3,9 @@ import { ethers } from "hardhat";
 
 export function shouldBehaveLikeFoundryDrop(): void {
   before(async function () {
-    console.log(this.signers.admin, this.signers.alice);
     this.signedDrop = await this.drop.connect(this.signers.admin);
-    this.aliceSignedDrop = await this.drop.connect(this.signers.alice);
+    this.aliceSignedDrop1 = await this.drop.connect(this.signers.alice1);
+    this.aliceSignedDrop2 = await this.drop.connect(this.signers.alice2);
   });
 
   context("initialize", async function () {
@@ -17,19 +17,34 @@ export function shouldBehaveLikeFoundryDrop(): void {
 
   context("setAddressList", function () {
     it("should work fine", async function () {
-      const _GuaranteedUsers = new Array(1000).fill(0).map((_, index) => index);
-      const _WhiteListUsers = new Array(1200).fill(0).map((_, index) => index);
-      await this.signedDrop.setGuaranteedSmartmintUsers(_GuaranteedUsers);
-      await this.signedDrop.setWhiteListSmartmintUsers(_WhiteListUsers);
+      const _GuaranteedAddresses = [
+        "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
+        "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
+        this.signers.admin.address,
+      ];
+      const _WhiteListAddresses = [
+        "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
+        "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
+        this.signers.admin.address,
+        this.signers.alice1.address,
+      ];
+      await this.signedDrop.setGuaranteedAddresses(_GuaranteedAddresses);
+      await this.signedDrop.setWhiteListAddresses(_WhiteListAddresses);
     });
 
     it("returns an error if caller is not an owner", async function () {
-      const _GuaranteedUsers = new Array(1200).fill(0).map((_, index) => index);
-      const _WhiteListUsers = new Array(1200).fill(0).map((_, index) => index);
-      await expect(this.aliceSignedDrop.setGuaranteedSmartmintUsers(_GuaranteedUsers)).to.be.revertedWith(
+      const _GuaranteedAddresses = [
+        "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
+        "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
+      ];
+      const _WhiteListAddresses = [
+        "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
+        "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
+      ];
+      await expect(this.aliceSignedDrop1.setGuaranteedAddresses(_GuaranteedAddresses)).to.be.revertedWith(
         "Ownable: caller is not the owner",
       );
-      await expect(this.aliceSignedDrop.setWhiteListSmartmintUsers(_WhiteListUsers)).to.be.revertedWith(
+      await expect(this.aliceSignedDrop1.setWhiteListAddresses(_WhiteListAddresses)).to.be.revertedWith(
         "Ownable: caller is not the owner",
       );
     });
@@ -37,49 +52,67 @@ export function shouldBehaveLikeFoundryDrop(): void {
 
   context("mint", function () {
     it("should not work at staging 0", async function () {
-      await expect(this.signedDrop.mint(1, 1, { value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
+      await expect(this.signedDrop.mint(1, { value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
         "Not started minting yet",
       );
     });
 
+    it("should pre-mint not work if caller is not owner", async function () {
+      await expect(
+        this.aliceSignedDrop1.pre_mint("0xCE9d85110a662b2bd7bE0A08165Dd60C8A7B93a7", 300),
+      ).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("should pre-mint work at staging 0", async function () {
+      await this.signedDrop.pre_mint("0xCE9d85110a662b2bd7bE0A08165Dd60C8A7B93a7", 300);
+      expect(await this.signedDrop.totalSupply()).to.equal(300);
+    });
+
     it("should work fine at staging 1", async function () {
       await this.signedDrop.setStage(1, ethers.utils.parseEther("0.01"));
-      await this.signedDrop.mint(1, 1, { value: ethers.utils.parseEther("0.01") });
-      expect(await this.signedDrop.totalSupply()).to.equal(1);
+      await this.signedDrop.mint(1, { value: ethers.utils.parseEther("0.01") });
+      expect(await this.signedDrop.totalSupply()).to.equal(301);
+    });
+
+    it("should pre-mint not work at staging 1", async function () {
+      await expect(this.signedDrop.pre_mint("0xCE9d85110a662b2bd7bE0A08165Dd60C8A7B93a7", 300)).to.be.revertedWith(
+        "Can only pre-mint when minting is not started",
+      );
     });
 
     it("should work not work at staging 1 when user is not guaranteed", async function () {
-      await expect(this.signedDrop.mint(1001, 1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+      await expect(this.aliceSignedDrop1.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
         "You are not a guaranteed user, you are unable to mint during this stage",
       );
     });
 
     it("should work not work at staging 1 when user tries to mint again", async function () {
-      await expect(this.signedDrop.mint(1, 1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+      await expect(this.signedDrop.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
         "You are not able to purchase those tokens",
       );
     });
 
-    it("should work fine at staging 2", async function () {
-      await this.signedDrop.setStage(2, ethers.utils.parseEther("0.01"));
-      await this.signedDrop.mint(1001, 1, { value: ethers.utils.parseEther("0.01") });
-      expect(await this.signedDrop.totalSupply()).to.equal(2);
-    });
-
     it("should work not work at staging 2 when user is not whitelisted", async function () {
-      await expect(this.signedDrop.mint(1300, 1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+      await this.signedDrop.setStage(2, ethers.utils.parseEther("0.01"));
+      await expect(this.aliceSignedDrop2.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
         "You are not a FCFS user, you are unable to mint during this stage",
       );
     });
 
-    it("should work fine at staging 3", async function () {
+    it("should work fine at staging 2", async function () {
+      await this.aliceSignedDrop1.mint(1, { value: ethers.utils.parseEther("0.01") });
+      expect(await this.signedDrop.totalSupply()).to.equal(302);
+    });
+
+    it("should not work if max supply sold out", async function () {
       await this.signedDrop.setStage(3, ethers.utils.parseEther("0.01"));
-      await this.signedDrop.mint(1300, 1, { value: ethers.utils.parseEther("0.01") });
-      expect(await this.signedDrop.totalSupply()).to.equal(3);
+      await expect(this.aliceSignedDrop2.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+        "No available tokens",
+      );
     });
 
     it("returns an error with insufficient price", async function () {
-      await expect(this.signedDrop.mint(2, 1, { value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
+      await expect(this.aliceSignedDrop2.mint(1, { value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
         "Insufficient price",
       );
     });
@@ -92,7 +125,7 @@ export function shouldBehaveLikeFoundryDrop(): void {
     });
 
     it("returns an error with if caller is not an owner", async function () {
-      await expect(this.aliceSignedDrop.setBaseURI("_updatedBaseURI")).to.revertedWith(
+      await expect(this.aliceSignedDrop1.setBaseURI("_updatedBaseURI")).to.revertedWith(
         "Ownable: caller is not the owner",
       );
     });
@@ -105,7 +138,7 @@ export function shouldBehaveLikeFoundryDrop(): void {
     });
 
     it("returns an error with if caller is not an owner", async function () {
-      await expect(this.aliceSignedDrop.setPrice(BigInt(10000000000000000))).to.revertedWith(
+      await expect(this.aliceSignedDrop1.setPrice(BigInt(10000000000000000))).to.revertedWith(
         "Ownable: caller is not the owner",
       );
     });
@@ -118,9 +151,9 @@ export function shouldBehaveLikeFoundryDrop(): void {
     });
 
     it("returns an error with if caller is not an owner", async function () {
-      await expect(this.aliceSignedDrop.setPrimaryWallet("0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd")).to.revertedWith(
-        "Ownable: caller is not the owner",
-      );
+      await expect(
+        this.aliceSignedDrop1.setPrimaryWallet("0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd"),
+      ).to.revertedWith("Ownable: caller is not the owner");
     });
   });
 
@@ -138,7 +171,7 @@ export function shouldBehaveLikeFoundryDrop(): void {
     });
 
     it("returns an error if caller is not an owner", async function () {
-      await expect(this.aliceSignedDrop.withdraw()).to.revertedWith("Ownable: caller is not the owner");
+      await expect(this.aliceSignedDrop1.withdraw()).to.revertedWith("Ownable: caller is not the owner");
     });
   });
 }
