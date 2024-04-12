@@ -10,7 +10,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 /**
- * @title PastelSmartMintDrop
+ * @title FoundryDrop
  *
  */
 
@@ -27,7 +27,6 @@ contract FoundryDrop is
     uint256 public royaltiesPercentage;
     uint32 public maxSupply;
     uint8 public stage; // 1 => Guaranteed, 2 => PrivateSale, 3 => PublicSale
-    uint8 public maxPurchaseableCount;
     string[] public cascadeUrls;
 
     mapping(address => bool) public isGuaranteedAddress;
@@ -49,7 +48,6 @@ contract FoundryDrop is
         string memory _name,
         string memory _symbol,
         uint32 _maxSupply,
-        uint8 _maxPurchaseableCount,
         uint256 _royaltiesPercentage,
         string memory _baseTokenURI,
         address _primaryWallet
@@ -64,7 +62,6 @@ contract FoundryDrop is
         primaryWallet = _primaryWallet;
 
         maxSupply = _maxSupply;
-        maxPurchaseableCount = _maxPurchaseableCount;
         royaltiesPercentage = _royaltiesPercentage;
         nextTokenId = 1;
         initialized = true;
@@ -97,11 +94,7 @@ contract FoundryDrop is
         }
     }
 
-    function mint(uint256 _quantity) external payable nonReentrant {
-        require(
-            _quantity <= maxPurchaseableCount && _quantity > 0,
-            "Users can only mint from one to three tokens at a time"
-        );
+    function mint() external payable nonReentrant {
         require(stage > 0, "Not started minting yet");
 
         if (stage == 1) {
@@ -112,22 +105,17 @@ contract FoundryDrop is
         } else if (stage == 2) {
             require(
                 isWhitelistedAddress[msg.sender] || isGuaranteedAddress[msg.sender],
-                "You are not a FCFS user, you are unable to mint during this stage"
+                "You are not a FCFS or guaranteed user, you are unable to mint during this stage"
             );
         }
-        require(
-            hasUserMintedAddress[msg.sender] + _quantity <= maxPurchaseableCount,
-            "You are not able to purchase those tokens"
-        );
-        require(msg.value >= price * _quantity, "Insufficient price");
+        require(hasUserMintedAddress[msg.sender] < 1, "You are not able to purchase those tokens");
+        require(msg.value >= price, "Insufficient price");
+        require(nextTokenId < maxSupply + 1, "No available tokens");
 
-        for (uint256 i = 0; i < _quantity; i++) {
-            require(nextTokenId < maxSupply + 1, "No available tokens");
-            _safeMint(msg.sender, nextTokenId);
-            hasUserMintedAddress[msg.sender]++;
-            emit Minted(msg.sender, nextTokenId);
-            nextTokenId += 1;
-        }
+        _safeMint(msg.sender, nextTokenId);
+        hasUserMintedAddress[msg.sender]++;
+        emit Minted(msg.sender, nextTokenId);
+        nextTokenId += 1;
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -138,10 +126,6 @@ contract FoundryDrop is
         require(_maxSupply > nextTokenId, "Invalid maxSupply updating request");
 
         maxSupply = _maxSupply;
-    }
-
-    function setMaxPurchaseableCount(uint8 _maxPurchaseableCount) external onlyOwner {
-        maxPurchaseableCount = _maxPurchaseableCount;
     }
 
     function setBaseURI(string calldata _uri) external onlyOwner {

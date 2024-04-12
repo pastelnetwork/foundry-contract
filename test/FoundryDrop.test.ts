@@ -25,7 +25,6 @@ describe("FoundryDrop", function () {
         "FoundrySample",
         "FoundrySample",
         302,
-        1,
         5,
         "base_uri",
         "0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd",

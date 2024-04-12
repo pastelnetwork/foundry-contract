@@ -52,7 +52,7 @@ export function shouldBehaveLikeFoundryDrop(): void {
 
   context("mint", function () {
     it("should not work at staging 0", async function () {
-      await expect(this.signedDrop.mint(1, { value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
+      await expect(this.signedDrop.mint({ value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
         "Not started minting yet",
       );
     });
@@ -70,7 +70,7 @@ export function shouldBehaveLikeFoundryDrop(): void {
 
     it("should work fine at staging 1", async function () {
       await this.signedDrop.setStage(1, ethers.utils.parseEther("0.01"));
-      await this.signedDrop.mint(1, { value: ethers.utils.parseEther("0.01") });
+      await this.signedDrop.mint({ value: ethers.utils.parseEther("0.01") });
       expect(await this.signedDrop.totalSupply()).to.equal(301);
     });
 
@@ -81,38 +81,38 @@ export function shouldBehaveLikeFoundryDrop(): void {
     });
 
     it("should work not work at staging 1 when user is not guaranteed", async function () {
-      await expect(this.aliceSignedDrop1.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+      await expect(this.aliceSignedDrop1.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
         "You are not a guaranteed user, you are unable to mint during this stage",
       );
     });
 
     it("should work not work at staging 1 when user tries to mint again", async function () {
-      await expect(this.signedDrop.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+      await expect(this.signedDrop.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
         "You are not able to purchase those tokens",
       );
     });
 
     it("should work not work at staging 2 when user is not whitelisted", async function () {
       await this.signedDrop.setStage(2, ethers.utils.parseEther("0.01"));
-      await expect(this.aliceSignedDrop2.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
-        "You are not a FCFS user, you are unable to mint during this stage",
+      await expect(this.aliceSignedDrop2.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+        "You are not a FCFS or guaranteed user, you are unable to mint during this stage",
       );
     });
 
     it("should work fine at staging 2", async function () {
-      await this.aliceSignedDrop1.mint(1, { value: ethers.utils.parseEther("0.01") });
+      await this.aliceSignedDrop1.mint({ value: ethers.utils.parseEther("0.01") });
       expect(await this.signedDrop.totalSupply()).to.equal(302);
     });
 
     it("should not work if max supply sold out", async function () {
       await this.signedDrop.setStage(3, ethers.utils.parseEther("0.01"));
-      await expect(this.aliceSignedDrop2.mint(1, { value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
+      await expect(this.aliceSignedDrop2.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
         "No available tokens",
       );
     });
 
     it("returns an error with insufficient price", async function () {
-      await expect(this.aliceSignedDrop2.mint(1, { value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
+      await expect(this.aliceSignedDrop2.mint({ value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
         "Insufficient price",
       );
     });

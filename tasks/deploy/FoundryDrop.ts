@@ -12,7 +12,6 @@ task("deploy:FoundryDrop")
   .addParam("name", "Name of the contract")
   .addParam("symbol", "Symbol of the contract")
   .addParam("maxSupply", "Max supply of the contract")
-  .addParam("maxMintPerTx", "Max mint per transaction")
   .addParam("royalty", "Royalty percentage")
   .addParam("baseUri", "Base URI of the contract")
   .addParam("primaryWallet", "Primary wallet address")
@@ -24,7 +23,6 @@ task("deploy:FoundryDrop")
         taskArguments.name,
         taskArguments.symbol,
         parseInt(taskArguments.maxSupply, 10),
-        parseInt(taskArguments.maxMintPerTx, 10),
         parseInt(taskArguments.royalty, 10),
         taskArguments.baseUri,
         taskArguments.primaryWallet,

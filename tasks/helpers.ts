@@ -27,6 +27,10 @@ export const getProvider = () => {
     return ethers.getDefaultProvider(getEnvVariable("MAINNET_URL", ""), {
       infura: getEnvVariable("INFURA_KEY"),
     });
+  } else if (getEnvVariable("NETWORK", "polygon") === "polygon") {
+    return ethers.getDefaultProvider(getEnvVariable("POLYGON_URL", ""), {
+      infura: getEnvVariable("INFURA_KEY"),
+    });
   } else {
     return ethers.getDefaultProvider(getEnvVariable("NETWORK", "rinkeby"), {
       infura: getEnvVariable("INFURA_KEY"),

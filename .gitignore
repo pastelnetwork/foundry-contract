@@ -37,4 +37,4 @@ src/types/factories/*
 !src/types/factories/Greeter__factory.ts
 
 # openzeppelin
-./openzeppelin
+.openzeppelin
