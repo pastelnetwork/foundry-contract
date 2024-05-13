@@ -21,14 +21,7 @@ describe("FoundryDrop", function () {
     const dropFactory: FoundryDrop__factory = <FoundryDrop__factory>await ethers.getContractFactory("FoundryDrop");
 
     this.drop = <FoundryDrop>(
-      await upgrades.deployProxy(dropFactory, [
-        "FoundrySample",
-        "FoundrySample",
-        302,
-        5,
-        "base_uri",
-        "0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd",
-      ])
+      await upgrades.deployProxy(dropFactory, ["FoundrySample", "FoundrySample", 302, 5, "base_uri"])
     );
     await this.drop.deployed();
   });

@@ -90,6 +90,7 @@
     "@openzeppelin/contracts": "^4.5.0",
     "@openzeppelin/contracts-upgradeable": "^4.5.2",
     "@openzeppelin/hardhat-upgrades": "^1.17.0",
+    "@openzeppelin/merkle-tree": "^1.0.6",
     "dlx": "^0.2.1",
     "solc": "^0.8.13"
   },

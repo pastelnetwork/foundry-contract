@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /**
  * @title FoundryDrop
@@ -23,14 +24,13 @@ contract FoundryDrop is
 {
     string public baseURI;
     uint256 public price;
-    address public primaryWallet;
     uint256 public royaltiesPercentage;
     uint32 public maxSupply;
     uint8 public stage; // 1 => Guaranteed, 2 => PrivateSale, 3 => PublicSale
     string[] public cascadeUrls;
+    bytes32 public guaranteedListMerkleRoot;
+    bytes32 public whiteListMerkleRoot;
 
-    mapping(address => bool) public isGuaranteedAddress;
-    mapping(address => bool) public isWhitelistedAddress;
     mapping(address => uint256) public hasUserMintedAddress;
 
     event Minted(address indexed _to, uint256 _tokenId);
@@ -49,17 +49,14 @@ contract FoundryDrop is
         string memory _symbol,
         uint32 _maxSupply,
         uint256 _royaltiesPercentage,
-        string memory _baseTokenURI,
-        address _primaryWallet
+        string memory _baseTokenURI
     ) public initializer {
         require(!initialized, "Already initialized");
-        require(_primaryWallet != address(0), "Invalid primary, or pastel wallet address");
         require(_royaltiesPercentage < 10000, "Invalid royalties");
 
         __ERC721_init(_name, _symbol);
         __Ownable_init();
         baseURI = _baseTokenURI;
-        primaryWallet = _primaryWallet;
 
         maxSupply = _maxSupply;
         royaltiesPercentage = _royaltiesPercentage;
@@ -94,17 +91,27 @@ contract FoundryDrop is
         }
     }
 
-    function mint() external payable nonReentrant {
+    function verifyGuaranteed(address _address, bytes32[] calldata _proof) public view returns (bool) {
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_address))));
+        return MerkleProof.verify(_proof, guaranteedListMerkleRoot, leaf);
+    }
+
+    function verifyWhiteList(address _address, bytes32[] calldata _proof) public view returns (bool) {
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_address))));
+        return MerkleProof.verify(_proof, whiteListMerkleRoot, leaf);
+    }
+
+    function mint(bytes32[] calldata _proof) external payable nonReentrant {
         require(stage > 0, "Not started minting yet");
 
         if (stage == 1) {
             require(
-                isGuaranteedAddress[msg.sender],
+                verifyGuaranteed(msg.sender, _proof),
                 "You are not a guaranteed user, you are unable to mint during this stage"
             );
         } else if (stage == 2) {
             require(
-                isWhitelistedAddress[msg.sender] || isGuaranteedAddress[msg.sender],
+                verifyGuaranteed(msg.sender, _proof) || verifyWhiteList(msg.sender, _proof),
                 "You are not a FCFS or guaranteed user, you are unable to mint during this stage"
             );
         }
@@ -138,12 +145,6 @@ contract FoundryDrop is
         price = _price;
     }
 
-    function setPrimaryWallet(address _primaryWallet) external onlyOwner {
-        require(_primaryWallet != address(0), "Invalid primary wallet address");
-
-        primaryWallet = _primaryWallet;
-    }
-
     function setStage(uint8 _stage, uint256 _price) external onlyOwner {
         require(_stage < 4 && _stage > 0 && _stage > stage, "Invalid stage");
 
@@ -151,16 +152,12 @@ contract FoundryDrop is
         price = _price;
     }
 
-    function setGuaranteedAddresses(address[] memory _guaranteedAddresses) external onlyOwner {
-        for (uint256 i = 0; i < _guaranteedAddresses.length; i++) {
-            isGuaranteedAddress[_guaranteedAddresses[i]] = true;
-        }
+    function setGuaranteedMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        guaranteedListMerkleRoot = _merkleRoot;
     }
 
-    function setWhiteListAddresses(address[] memory _whiteListAddresses) external onlyOwner {
-        for (uint256 i = 0; i < _whiteListAddresses.length; i++) {
-            isWhitelistedAddress[_whiteListAddresses[i]] = true;
-        }
+    function setWhiteListMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
+        whiteListMerkleRoot = _merkleRoot;
     }
 
     function totalBalance() external view returns (uint256) {
@@ -174,19 +171,6 @@ contract FoundryDrop is
     function royaltyInfo(uint256 _tokenId, uint256 _salePrice) external view returns (address, uint256) {
         require(_exists(_tokenId), "Invalid token id");
         uint256 _royalties = (_salePrice * royaltiesPercentage) / 10000;
-        return (primaryWallet, _royalties);
-    }
-
-    function withdraw() external onlyOwner nonReentrant {
-        require(
-            address(this).balance > 0 && primaryWallet != address(0),
-            "No funds to withdraw, or invalid wallet address to send."
-        );
-
-        payable(primaryWallet).transfer(address(this).balance);
-
-        address payable to = payable(msg.sender);
-        require(to != address(0), "Invalid recipient address");
-        AddressUpgradeable.sendValue(to, address(this).balance);
+        return (owner(), _royalties);
     }
 }

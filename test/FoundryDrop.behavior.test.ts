@@ -1,5 +1,35 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
+import fs from "fs";
+
+// Function to generate Merkle root and proof
+function generateMerkleTree(whitelist: string[]) {
+  const tree = StandardMerkleTree.of(
+    whitelist.map(add => [add]),
+    ["address"],
+  );
+
+  fs.writeFileSync("tree.json", JSON.stringify(tree.dump()));
+  return tree.root;
+}
+
+function generateMerkleProof(whitelist: string[], address: string) {
+  const tree = StandardMerkleTree.of(
+    whitelist.map(add => [add]),
+    ["address"],
+  );
+  for (const [i, v] of tree.entries()) {
+    if (v[0] === address) {
+      console.log(i);
+      return tree.getProof(i);
+    }
+  }
+  return ["0x0000000000000000000000000000000000000000000000000000000000000000"];
+}
+
+let _GuaranteedAddresses: string[] = [];
+let _WhiteListAddresses: string[] = [];
 
 export function shouldBehaveLikeFoundryDrop(): void {
   before(async function () {
@@ -17,44 +47,38 @@ export function shouldBehaveLikeFoundryDrop(): void {
 
   context("setAddressList", function () {
     it("should work fine", async function () {
-      const _GuaranteedAddresses = [
+      _GuaranteedAddresses = [
         "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
         "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
         this.signers.admin.address,
       ];
-      const _WhiteListAddresses = [
+      _WhiteListAddresses = [
         "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
         "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
         this.signers.admin.address,
         this.signers.alice1.address,
       ];
-      await this.signedDrop.setGuaranteedAddresses(_GuaranteedAddresses);
-      await this.signedDrop.setWhiteListAddresses(_WhiteListAddresses);
+      await this.signedDrop.setGuaranteedMerkleRoot(generateMerkleTree(_GuaranteedAddresses));
+      await this.signedDrop.setWhiteListMerkleRoot(generateMerkleTree(_WhiteListAddresses));
     });
 
     it("returns an error if caller is not an owner", async function () {
-      const _GuaranteedAddresses = [
-        "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
-        "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
-      ];
-      const _WhiteListAddresses = [
-        "0x185b3F6618A50122C70FD100C7Aac729621B8a25",
-        "0xFD2b3c9DF1c8e3493540dfd05EA951d584aB34c4",
-      ];
-      await expect(this.aliceSignedDrop1.setGuaranteedAddresses(_GuaranteedAddresses)).to.be.revertedWith(
-        "Ownable: caller is not the owner",
-      );
-      await expect(this.aliceSignedDrop1.setWhiteListAddresses(_WhiteListAddresses)).to.be.revertedWith(
-        "Ownable: caller is not the owner",
-      );
+      await expect(
+        this.aliceSignedDrop1.setGuaranteedMerkleRoot(generateMerkleTree(_GuaranteedAddresses)),
+      ).to.be.revertedWith("Ownable: caller is not the owner");
+      await expect(
+        this.aliceSignedDrop1.setWhiteListMerkleRoot(generateMerkleTree(_WhiteListAddresses)),
+      ).to.be.revertedWith("Ownable: caller is not the owner");
     });
   });
 
   context("mint", function () {
     it("should not work at staging 0", async function () {
-      await expect(this.signedDrop.mint({ value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
-        "Not started minting yet",
-      );
+      await expect(
+        this.signedDrop.mint(generateMerkleProof(_GuaranteedAddresses, this.signers.admin.address), {
+          value: ethers.utils.parseEther("0.005"),
+        }),
+      ).to.be.revertedWith("Not started minting yet");
     });
 
     it("should pre-mint not work if caller is not owner", async function () {
@@ -70,7 +94,9 @@ export function shouldBehaveLikeFoundryDrop(): void {
 
     it("should work fine at staging 1", async function () {
       await this.signedDrop.setStage(1, ethers.utils.parseEther("0.01"));
-      await this.signedDrop.mint({ value: ethers.utils.parseEther("0.01") });
+      await this.signedDrop.mint(generateMerkleProof(_GuaranteedAddresses, this.signers.admin.address), {
+        value: ethers.utils.parseEther("0.01"),
+      });
       expect(await this.signedDrop.totalSupply()).to.equal(301);
     });
 
@@ -81,40 +107,52 @@ export function shouldBehaveLikeFoundryDrop(): void {
     });
 
     it("should work not work at staging 1 when user is not guaranteed", async function () {
-      await expect(this.aliceSignedDrop1.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
-        "You are not a guaranteed user, you are unable to mint during this stage",
-      );
+      await expect(
+        this.aliceSignedDrop1.mint(generateMerkleProof(_GuaranteedAddresses, this.signers.alice1.address), {
+          value: ethers.utils.parseEther("0.01"),
+        }),
+      ).to.be.revertedWith("You are not a guaranteed user, you are unable to mint during this stage");
     });
 
     it("should work not work at staging 1 when user tries to mint again", async function () {
-      await expect(this.signedDrop.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
-        "You are not able to purchase those tokens",
-      );
+      await expect(
+        this.signedDrop.mint(generateMerkleProof(_GuaranteedAddresses, this.signers.admin.address), {
+          value: ethers.utils.parseEther("0.01"),
+        }),
+      ).to.be.revertedWith("You are not able to purchase those tokens");
     });
 
     it("should work not work at staging 2 when user is not whitelisted", async function () {
       await this.signedDrop.setStage(2, ethers.utils.parseEther("0.01"));
-      await expect(this.aliceSignedDrop2.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
-        "You are not a FCFS or guaranteed user, you are unable to mint during this stage",
-      );
+      await expect(
+        this.aliceSignedDrop2.mint(generateMerkleProof(_WhiteListAddresses, this.signers.alice2.address), {
+          value: ethers.utils.parseEther("0.01"),
+        }),
+      ).to.be.revertedWith("You are not a FCFS or guaranteed user, you are unable to mint during this stage");
     });
 
     it("should work fine at staging 2", async function () {
-      await this.aliceSignedDrop1.mint({ value: ethers.utils.parseEther("0.01") });
+      await this.aliceSignedDrop1.mint(generateMerkleProof(_WhiteListAddresses, this.signers.alice1.address), {
+        value: ethers.utils.parseEther("0.01"),
+      });
       expect(await this.signedDrop.totalSupply()).to.equal(302);
     });
 
     it("should not work if max supply sold out", async function () {
       await this.signedDrop.setStage(3, ethers.utils.parseEther("0.01"));
-      await expect(this.aliceSignedDrop2.mint({ value: ethers.utils.parseEther("0.01") })).to.be.revertedWith(
-        "No available tokens",
-      );
+      await expect(
+        this.aliceSignedDrop2.mint(generateMerkleProof(_WhiteListAddresses, this.signers.alice2.address), {
+          value: ethers.utils.parseEther("0.01"),
+        }),
+      ).to.be.revertedWith("No available tokens");
     });
 
     it("returns an error with insufficient price", async function () {
-      await expect(this.aliceSignedDrop2.mint({ value: ethers.utils.parseEther("0.005") })).to.be.revertedWith(
-        "Insufficient price",
-      );
+      await expect(
+        this.aliceSignedDrop2.mint(generateMerkleProof(_GuaranteedAddresses, this.signers.alice2.address), {
+          value: ethers.utils.parseEther("0.005"),
+        }),
+      ).to.be.revertedWith("Insufficient price");
     });
   });
 
@@ -141,37 +179,6 @@ export function shouldBehaveLikeFoundryDrop(): void {
       await expect(this.aliceSignedDrop1.setPrice(BigInt(10000000000000000))).to.revertedWith(
         "Ownable: caller is not the owner",
       );
-    });
-  });
-
-  context("setPrimaryWallet", function () {
-    it("should work fine", async function () {
-      await this.signedDrop.setPrimaryWallet("0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd");
-      expect(await this.signedDrop.primaryWallet()).to.equal("0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd");
-    });
-
-    it("returns an error with if caller is not an owner", async function () {
-      await expect(
-        this.aliceSignedDrop1.setPrimaryWallet("0xFFf50b1b9154b0631591DAB746c5Fc8f41Dc44Bd"),
-      ).to.revertedWith("Ownable: caller is not the owner");
-    });
-  });
-
-  context("withdraw", function () {
-    it("should work fine", async function () {
-      expect(await this.signedDrop.totalBalance()).to.not.equal(0);
-      await this.signedDrop.withdraw();
-      expect(await this.signedDrop.totalBalance()).to.equal(0);
-    });
-
-    it("returns an error if there's no fund", async function () {
-      await expect(this.signedDrop.withdraw()).to.be.revertedWith(
-        "No funds to withdraw, or invalid wallet address to send.",
-      );
-    });
-
-    it("returns an error if caller is not an owner", async function () {
-      await expect(this.aliceSignedDrop1.withdraw()).to.revertedWith("Ownable: caller is not the owner");
     });
   });
 }
